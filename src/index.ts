@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'child_process';
 import { readConfig } from './config.js';
-import { readCache, isCacheValidForSession } from './cache.js';
+import { acquireFetchLock, isCacheValidForSession, isFetchInProgress, readCache, releaseFetchLock } from './cache.js';
 import { render } from './render.js';
 
 // 获取或生成会话ID
@@ -16,14 +16,24 @@ function getSessionId(): string {
 
 // 后台刷新数据（异步，不阻塞）
 function triggerBackgroundFetch(): void {
+  if (!acquireFetchLock('background')) {
+    return;
+  }
+
   const runtime = process.argv[1]; // 当前脚本路径
   const fetcherPath = runtime.replace('index.js', 'fetch-cli.js');
 
-  spawn(process.execPath, [fetcherPath], {
+  const child = spawn(process.execPath, [fetcherPath], {
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, BAILIAN_FETCH: '1' }
+    env: { ...process.env, BAILIAN_FETCH: '1', BAILIAN_FETCH_LOCK_HELD: '1' }
   });
+
+  child.on('error', () => {
+    releaseFetchLock();
+  });
+
+  child.unref();
 }
 
 async function main() {
@@ -54,7 +64,9 @@ async function main() {
     }
 
     // 触发后台刷新
-    triggerBackgroundFetch();
+    if (!isFetchInProgress()) {
+      triggerBackgroundFetch();
+    }
 
   } catch (error) {
     // 出错时静默返回，不影响 claude-hud

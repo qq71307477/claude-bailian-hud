@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readConfig } from './config.js';
-import { readCache, writeCache } from './cache.js';
+import { acquireFetchLock, readCache, releaseFetchLock, writeCache } from './cache.js';
 import { fetchUsage } from './fetcher.js';
 function getSessionId() {
     const claudeSessionId = process.env.SESSION_ID;
@@ -18,16 +18,24 @@ async function main() {
     }
     const sessionId = getSessionId();
     const cache = readCache();
-    // 如果是后台触发且缓存仍然有效，跳过
-    if (process.env.BAILIAN_FETCH === '1' && cache) {
-        const now = Date.now();
-        const cacheAge = now - cache.timestamp;
-        if (cacheAge < 5 * 60 * 1000) { // 5分钟内不重复刷新
-            return;
-        }
+    const source = process.env.BAILIAN_FETCH === '1' ? 'background' : 'manual';
+    const hasLock = process.env.BAILIAN_FETCH_LOCK_HELD === '1'
+        ? true
+        : acquireFetchLock(source);
+    if (!hasLock) {
+        console.error('[bailian-hud] 已有刷新任务在运行，跳过重复抓取');
+        return;
     }
-    console.error('[bailian-hud] 开始刷新数据...');
     try {
+        // 如果是后台触发且缓存仍然有效，跳过
+        if (process.env.BAILIAN_FETCH === '1' && cache) {
+            const now = Date.now();
+            const cacheAge = now - cache.timestamp;
+            if (cacheAge < 5 * 60 * 1000) { // 5分钟内不重复刷新
+                return;
+            }
+        }
+        console.error('[bailian-hud] 开始刷新数据...');
         const data = await fetchUsage(config.username, config.password);
         writeCache(data, undefined, sessionId);
         console.error('[bailian-hud] 数据刷新完成');
@@ -38,6 +46,9 @@ async function main() {
         const message = error instanceof Error ? error.message : '刷新失败';
         console.error('[bailian-hud] 刷新失败:', message);
         writeCache(null, message, sessionId);
+    }
+    finally {
+        releaseFetchLock();
     }
 }
 main();

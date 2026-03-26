@@ -1,6 +1,6 @@
 ---
 description: 配置百炼 HUD - 设置账号密码并启用 statusLine
-allowed-tools: Bash, Read, Write
+allowed-tools: Bash, Read
 ---
 
 # 配置百炼 HUD
@@ -16,6 +16,8 @@ command -v bun 2>/dev/null || command -v node 2>/dev/null
 如果都没有，提示用户安装 Node.js 或 Bun。
 
 保存运行时路径为 `{RUNTIME_PATH}`。
+
+**后续所有写入 `~/.claude-bailian-hud/` 和 `~/.claude/settings.json` 的操作，都必须使用 Bash 完成。不要使用 Write 工具。**
 
 ## Step 2: 检查现有配置
 
@@ -39,9 +41,12 @@ cat ~/.claude-bailian-hud/config.json 2>/dev/null
 mkdir -p ~/.claude-bailian-hud
 ```
 
-检测原有的 statusLine 命令并生成脚本文件 `~/.claude-bailian-hud/statusline.sh`：
+检测原有的 statusLine 命令并生成脚本文件 `~/.claude-bailian-hud/statusline.sh`。
+
+**必须使用 Bash here-doc 写文件，不要使用 Write。**
 
 ```bash
+cat > ~/.claude-bailian-hud/statusline.sh <<'EOF'
 #!/bin/bash
 # 百炼 HUD statusLine 脚本
 
@@ -53,16 +58,19 @@ fi
 
 # 输出原有 HUD（如果存在）
 {ORIGINAL_HUD_COMMAND}
+EOF
 ```
 
 **如果原有 statusLine 存在**：提取其中的 HUD 命令（去掉 `exec`），放入脚本
 
 **如果原有 statusLine 存在**：同时备份到 `~/.claude-bailian-hud/original-statusline.json`，格式如下：
 
-```json
+```bash
+cat > ~/.claude-bailian-hud/original-statusline.json <<'EOF'
 {
   "originalCommand": "原始 statusLine command"
 }
+EOF
 ```
 
 **如果原有 statusLine 不存在**：该部分留空
@@ -112,30 +120,42 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 
 ## Step 5: 保存配置
 
-写入 `~/.claude-bailian-hud/config.json`：
+使用 Bash 写入 `~/.claude-bailian-hud/config.json`，不要使用 Write：
 
-```json
+```bash
+cat > ~/.claude-bailian-hud/config.json <<'EOF'
 {
   "username": "用户输入的账号",
   "password": "用户输入的密码",
   "sessionTimeoutMs": 600000
 }
+EOF
 ```
 
 ## Step 6: 更新 settings.json
 
-读取 `~/.claude/settings.json`，更新 statusLine：
+使用 Bash 调用 `{RUNTIME_PATH}` 更新 `~/.claude/settings.json`，保留所有现有配置，只更新 `statusLine`。
 
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "bash ~/.claude-bailian-hud/statusline.sh"
-  }
-}
+**不要使用 Write；如果这一步失败，立即停止，不要继续 Step 7。**
+
+```bash
+settings_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+mkdir -p "$(dirname "$settings_file")"
+[ -f "$settings_file" ] || printf '{}\n' > "$settings_file"
+
+SETTINGS_FILE="$settings_file" STATUSLINE_COMMAND="bash ~/.claude-bailian-hud/statusline.sh" {RUNTIME_PATH} -e '
+const fs = require("fs");
+const settingsFile = process.env.SETTINGS_FILE;
+const statusLineCommand = process.env.STATUSLINE_COMMAND;
+const raw = fs.readFileSync(settingsFile, "utf8");
+const data = raw.trim() ? JSON.parse(raw) : {};
+data.statusLine = {
+  type: "command",
+  command: statusLineCommand,
+};
+fs.writeFileSync(settingsFile, JSON.stringify(data, null, 2), "utf8");
+'
 ```
-
-保留所有现有配置，只更新 statusLine 部分。
 
 ## Step 7: 首次抓取数据
 
@@ -145,6 +165,8 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
 {RUNTIME_PATH} "${bailian_dir}dist/fetch-cli.js"
 ```
+
+**如果 Step 3 / Step 5 / Step 6 任一步写入失败，不要继续这一步。**
 
 提示用户可能需要在弹出的浏览器窗口中完成滑块验证。
 
