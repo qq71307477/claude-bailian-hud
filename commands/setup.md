@@ -17,24 +17,36 @@ command -v bun 2>/dev/null || command -v node 2>/dev/null
 
 保存运行时路径为 `{RUNTIME_PATH}`。
 
-## Step 2: 保存原有 statusLine 命令
+## Step 2: 创建 statusLine 脚本
 
-读取 `~/.claude/settings.json`，检查是否存在 `statusLine.command`。
-
-**如果存在**：保存到 `~/.claude-bailian-hud/original-statusline.json`
-
-```json
-{
-  "originalCommand": "原有的 statusLine 命令"
-}
+创建目录：
+```bash
+mkdir -p ~/.claude-bailian-hud
 ```
 
-**如果不存在**：写入空值
+检测原有的 statusLine 命令并生成脚本文件 `~/.claude-bailian-hud/statusline.sh`：
 
-```json
-{
-  "originalCommand": null
-}
+```bash
+#!/bin/bash
+# 百炼 HUD statusLine 脚本
+
+# 输出百炼数据
+bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
+if [ -n "$bailian_dir" ]; then
+  {RUNTIME_PATH} --env-file /dev/null "${bailian_dir}dist/index.js" 2>/dev/null
+fi
+
+# 输出原有 HUD（如果存在）
+{ORIGINAL_HUD_COMMAND}
+```
+
+**如果原有 statusLine 存在**：提取其中的 HUD 命令（去掉 `exec`），放入脚本
+
+**如果原有 statusLine 不存在**：该部分留空
+
+赋予执行权限：
+```bash
+chmod +x ~/.claude-bailian-hud/statusline.sh
 ```
 
 ## Step 3: 收集账号密码
@@ -63,52 +75,33 @@ command -v bun 2>/dev/null || command -v node 2>/dev/null
 }
 ```
 
-确保目录存在：
-```bash
-mkdir -p ~/.claude-bailian-hud
-```
+## Step 5: 更新 settings.json
 
-## Step 5: 生成 statusLine 命令
-
-生成一个组合命令：
-1. 先输出百炼数据
-2. 再执行原有的 statusLine 命令（如果存在）
-
-**生成的命令**：
-
-```
-bash -c 'bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1); if [ -n "$bailian_dir" ]; then node "${bailian_dir}dist/index.js" 2>/dev/null; fi; orig=$(cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/bailian-hud/original-statusline.json 2>/dev/null | grep -o "\"originalCommand\".*" | cut -d\" -f4); if [ -n "$orig" ] && [ "$orig" != "null" ]; then eval "$orig" 2>/dev/null; fi'
-```
-
-**如果运行时是 bun**，将 `node` 替换为 `bun --env-file /dev/null`。
-
-## Step 6: 写入 settings.json
-
-读取 `~/.claude/settings.json`，合并 statusLine 配置：
+读取 `~/.claude/settings.json`，更新 statusLine：
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "{GENERATED_COMMAND}"
+    "command": "bash ~/.claude-bailian-hud/statusline.sh"
   }
 }
 ```
 
 保留所有现有配置，只更新 statusLine 部分。
 
-## Step 7: 首次抓取数据
+## Step 6: 首次抓取数据
 
 执行 fetch-cli.js 进行首次数据抓取：
 
 ```bash
-bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
-node "${bailian_dir}dist/fetch-cli.js"
+bailian_dir=$(ls -d ~/.claude/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
+{RUNTIME_PATH} "${bailian_dir}dist/fetch-cli.js"
 ```
 
 提示用户可能需要在弹出的浏览器窗口中完成滑块验证。
 
-## Step 8: 完成提示
+## Step 7: 完成提示
 
 告知用户：
 
