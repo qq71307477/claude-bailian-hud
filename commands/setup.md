@@ -71,28 +71,19 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 
 ## Step 4: 收集账号密码
 
-**重要：** AskUserQuestion 会自动在选项列表末尾显示「Other」选项，选择 Other 才能输入自定义文本。
+**直接询问用户账号密码，让用户在对话中回复。**
 
-使用 AskUserQuestion 询问用户：
+输出提示：
 
-**问题1 - 手机号：**
-- header: "手机号"
-- question: "请选择列表最下方的「Other」选项，然后输入您的阿里云账号（手机号）"
-- options:
-  - label: "请选下方的 Other"
-    description: "Other 在选项列表最下面"
+> 脚本已创建。现在需要您的阿里云账号信息。
+>
+> 请直接在对话中告诉我：
+> - 手机号：您的阿里云账号（手机号）
+> - 密码：您的阿里云密码
 
-**问题2 - 密码：**
-- header: "密码"
-- question: "请选择列表最下方的「Other」选项，然后输入您的阿里云密码"
-- options:
-  - label: "请选下方的 Other"
-    description: "Other 在选项列表最下面"
+等待用户回复，然后解析手机号和密码。
 
-**操作步骤：**
-1. 用 ↓ 箭头键滚动到列表最底部
-2. 找到「Other」选项，按 Enter 选择
-3. 在弹出的输入框中输入手机号/密码
+**注意：** 不要使用 AskUserQuestion，直接在对话中询问，用户回复后提取信息即可。
 
 ## Step 5: 保存配置
 
