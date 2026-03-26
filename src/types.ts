@@ -23,3 +23,39 @@ export interface Config {
   password: string;
   sessionTimeoutMs: number; // 会话超时时间（毫秒），超时后视为新会话
 }
+
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonObject
+  | JsonValue[];
+
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+export interface StatusLineSnapshot {
+  existed: boolean;
+  value?: JsonObject;
+}
+
+export interface InstallState {
+  version: number;
+  installedAt: string;
+  statusLine: StatusLineSnapshot;
+}
+
+export type SettingsFile = JsonObject & {
+  statusLine?: JsonObject;
+  enabledPlugins?: Record<string, boolean>;
+  extraKnownMarketplaces?: Record<string, JsonValue>;
+};
+
+export type InstalledPluginsFile = JsonObject & {
+  version?: number;
+  plugins?: Record<string, JsonValue>;
+};
+
+export type KnownMarketplacesFile = JsonObject;

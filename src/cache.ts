@@ -1,11 +1,8 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import type { Cache, UsageData } from './types.js';
+import { readJsonFile, writeJsonFileAtomic } from './fs-utils.js';
+import { ensureRuntimeDir } from './runtime.js';
 
-const CACHE_DIR = path.join(os.homedir(), '.claude-bailian-hud');
-const CACHE_FILE = path.join(CACHE_DIR, 'cache.json');
-const FETCH_LOCK_FILE = path.join(CACHE_DIR, 'fetch.lock.json');
 const FETCH_LOCK_MAX_AGE_MS = 15 * 60 * 1000;
 
 interface FetchLock {
@@ -15,32 +12,22 @@ interface FetchLock {
 }
 
 export function ensureCacheDir(): void {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-  }
+  ensureRuntimeDir();
 }
 
 export function readCache(): Cache | null {
-  try {
-    if (!fs.existsSync(CACHE_FILE)) {
-      return null;
-    }
-    const content = fs.readFileSync(CACHE_FILE, 'utf-8');
-    return JSON.parse(content) as Cache;
-  } catch {
-    return null;
-  }
+  return readJsonFile<Cache>(ensureRuntimeDir().cacheFile);
 }
 
 export function writeCache(data: UsageData | null, error?: string, sessionId?: string): void {
-  ensureCacheDir();
+  const { cacheFile } = ensureRuntimeDir();
   const cache: Cache = {
     data,
     timestamp: Date.now(),
     sessionId,
     error,
   };
-  fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), 'utf-8');
+  writeJsonFileAtomic(cacheFile, cache, 0o600);
 }
 
 // 检查是否是同一会话且缓存有效
@@ -60,10 +47,11 @@ export function isSessionTimeout(cache: Cache, sessionTimeoutMs: number): boolea
 
 function readFetchLock(): FetchLock | null {
   try {
-    if (!fs.existsSync(FETCH_LOCK_FILE)) {
+    const { fetchLockFile } = ensureRuntimeDir();
+    if (!fs.existsSync(fetchLockFile)) {
       return null;
     }
-    const content = fs.readFileSync(FETCH_LOCK_FILE, 'utf-8');
+    const content = fs.readFileSync(fetchLockFile, 'utf-8');
     return JSON.parse(content) as FetchLock;
   } catch {
     return null;
@@ -82,8 +70,9 @@ function isProcessAlive(pid: number): boolean {
 
 export function releaseFetchLock(): void {
   try {
-    if (fs.existsSync(FETCH_LOCK_FILE)) {
-      fs.unlinkSync(FETCH_LOCK_FILE);
+    const { fetchLockFile } = ensureRuntimeDir();
+    if (fs.existsSync(fetchLockFile)) {
+      fs.unlinkSync(fetchLockFile);
     }
   } catch {
     // 忽略锁文件清理失败，避免影响主流程
@@ -107,7 +96,7 @@ export function isFetchInProgress(maxAgeMs: number = FETCH_LOCK_MAX_AGE_MS): boo
 }
 
 export function acquireFetchLock(source?: string, maxAgeMs: number = FETCH_LOCK_MAX_AGE_MS): boolean {
-  ensureCacheDir();
+  const { fetchLockFile } = ensureRuntimeDir();
 
   if (isFetchInProgress(maxAgeMs)) {
     return false;
@@ -122,7 +111,7 @@ export function acquireFetchLock(source?: string, maxAgeMs: number = FETCH_LOCK_
   const serialized = JSON.stringify(payload, null, 2);
 
   try {
-    const fd = fs.openSync(FETCH_LOCK_FILE, 'wx');
+    const fd = fs.openSync(fetchLockFile, 'wx');
     fs.writeFileSync(fd, serialized, 'utf-8');
     fs.closeSync(fd);
     return true;
@@ -132,7 +121,7 @@ export function acquireFetchLock(source?: string, maxAgeMs: number = FETCH_LOCK_
       if (!isFetchInProgress(maxAgeMs)) {
         try {
           releaseFetchLock();
-          const fd = fs.openSync(FETCH_LOCK_FILE, 'wx');
+          const fd = fs.openSync(fetchLockFile, 'wx');
           fs.writeFileSync(fd, serialized, 'utf-8');
           fs.closeSync(fd);
           return true;

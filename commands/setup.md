@@ -17,14 +17,12 @@ command -v bun 2>/dev/null || command -v node 2>/dev/null
 
 保存运行时路径为 `{RUNTIME_PATH}`。
 
-**后续所有写入 `~/.claude-bailian-hud/` 和 `~/.claude/settings.json` 的操作，都必须使用 Bash 完成。不要使用 Write 工具。**
-
 ## Step 2: 检查现有配置
 
-读取 `~/.claude-bailian-hud/config.json`：
+优先读取新的运行时目录；如果新目录没有，再看看旧目录：
 
 ```bash
-cat ~/.claude-bailian-hud/config.json 2>/dev/null
+cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/claude-bailian-hud/config.json" 2>/dev/null || cat "$HOME/.claude-bailian-hud/config.json" 2>/dev/null
 ```
 
 **如果已存在配置**：不要使用 AskUserQuestion，也不要显示数字选项。
@@ -34,53 +32,7 @@ cat ~/.claude-bailian-hud/config.json 2>/dev/null
 > 检测到已有账号配置。本次 `/claude-bailian-hud:setup` 会覆盖旧的手机号和密码。
 > 如果您不想修改，停止继续回复即可；如果要更新，请按后面的固定格式发送。
 
-## Step 3: 创建 statusLine 脚本
-
-创建目录：
-```bash
-mkdir -p ~/.claude-bailian-hud
-```
-
-检测原有的 statusLine 命令并生成脚本文件 `~/.claude-bailian-hud/statusline.sh`。
-
-**必须使用 Bash here-doc 写文件，不要使用 Write。**
-
-```bash
-cat > ~/.claude-bailian-hud/statusline.sh <<'EOF'
-#!/bin/bash
-# 百炼 HUD statusLine 脚本
-
-# 输出百炼数据
-bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
-if [ -n "$bailian_dir" ]; then
-  {RUNTIME_PATH} --env-file /dev/null "${bailian_dir}dist/index.js" 2>/dev/null
-fi
-
-# 输出原有 HUD（如果存在）
-{ORIGINAL_HUD_COMMAND}
-EOF
-```
-
-**如果原有 statusLine 存在**：提取其中的 HUD 命令（去掉 `exec`），放入脚本
-
-**如果原有 statusLine 存在**：同时备份到 `~/.claude-bailian-hud/original-statusline.json`，格式如下：
-
-```bash
-cat > ~/.claude-bailian-hud/original-statusline.json <<'EOF'
-{
-  "originalCommand": "原始 statusLine command"
-}
-EOF
-```
-
-**如果原有 statusLine 不存在**：该部分留空
-
-赋予执行权限：
-```bash
-chmod +x ~/.claude-bailian-hud/statusline.sh
-```
-
-## Step 4: 收集账号密码
+## Step 3: 收集账号密码
 
 **请让用户在当前 Claude 对话输入框里直接发送账号密码，不要使用单独输入框或 AskUserQuestion。必须要求用户按固定格式回复，不能只发手机号数字。**
 
@@ -118,46 +70,31 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 - 不要使用 AskUserQuestion
 - 直接提示用户重新按同一模板发送
 
-## Step 5: 保存配置
+## Step 4: 执行 setup-cli
 
-使用 Bash 写入 `~/.claude-bailian-hud/config.json`，不要使用 Write：
+通过 here-doc 把用户刚刚发来的两行原样传给 `setup-cli.js`。**不要把手机号或密码直接拼到命令参数里。**
 
 ```bash
-cat > ~/.claude-bailian-hud/config.json <<'EOF'
-{
-  "username": "用户输入的账号",
-  "password": "用户输入的密码",
-  "sessionTimeoutMs": 600000
-}
+plugin_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
+[ -n "$plugin_dir" ] || { echo "未找到 claude-bailian-hud 插件安装目录"; exit 1; }
+
+cat <<'EOF' | "{RUNTIME_PATH}" "$plugin_dir/dist/setup-cli.js"
+手机号: 用户输入的账号
+密码: 用户输入的密码
 EOF
 ```
 
-## Step 6: 更新 settings.json
+`setup-cli.js` 会自动完成这些事情：
 
-使用 Bash 调用 `{RUNTIME_PATH}` 更新 `~/.claude/settings.json`，保留所有现有配置，只更新 `statusLine`。
+- 自动迁移旧的 `~/.claude-bailian-hud/` 到新的 `~/.claude/plugins/claude-bailian-hud/`
+- 原子写入 `config.json`，避免把 `settings.json` 写坏
+- 备份安装前的 `statusLine`
+- 生成 `statusline.sh`
+- 更新 `~/.claude/settings.json`
 
-**不要使用 Write；如果这一步失败，立即停止，不要继续 Step 7。**
+**如果这一步失败，立即停止，不要继续首次抓取。**
 
-```bash
-settings_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
-mkdir -p "$(dirname "$settings_file")"
-[ -f "$settings_file" ] || printf '{}\n' > "$settings_file"
-
-SETTINGS_FILE="$settings_file" STATUSLINE_COMMAND="bash ~/.claude-bailian-hud/statusline.sh" {RUNTIME_PATH} -e '
-const fs = require("fs");
-const settingsFile = process.env.SETTINGS_FILE;
-const statusLineCommand = process.env.STATUSLINE_COMMAND;
-const raw = fs.readFileSync(settingsFile, "utf8");
-const data = raw.trim() ? JSON.parse(raw) : {};
-data.statusLine = {
-  type: "command",
-  command: statusLineCommand,
-};
-fs.writeFileSync(settingsFile, JSON.stringify(data, null, 2), "utf8");
-'
-```
-
-## Step 7: 首次抓取数据
+## Step 5: 首次抓取数据
 
 执行 fetch-cli.js 进行首次数据抓取：
 
@@ -166,17 +103,18 @@ bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-b
 {RUNTIME_PATH} "${bailian_dir}dist/fetch-cli.js"
 ```
 
-**如果 Step 3 / Step 5 / Step 6 任一步写入失败，不要继续这一步。**
+**如果 Step 4 写入失败，不要继续这一步。**
 
 提示用户可能需要在弹出的浏览器窗口中完成滑块验证。
 
-## Step 8: 完成提示
+## Step 6: 完成提示
 
 告知用户：
 
 > ✅ 配置完成！
 >
 > 请重启 Claude Code 使 statusLine 生效。
+> 运行时文件现在会统一放在 `~/.claude/plugins/claude-bailian-hud/`。
 >
 > 显示效果（百炼在最上方）：
 > ```
@@ -185,3 +123,5 @@ bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-b
 > ```
 >
 > 手动刷新数据：`/claude-bailian-hud:fetch`
+>
+> 如果以后要彻底恢复安装前状态，请先运行：`/claude-bailian-hud:uninstall`

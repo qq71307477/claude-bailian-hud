@@ -1,6 +1,6 @@
 {
   "name": "claude-bailian-hud",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "百炼 Coding Plan 用量监控 - Claude Code statusLine 插件",
   "type": "module",
   "main": "dist/index.js",

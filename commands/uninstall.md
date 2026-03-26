@@ -1,55 +1,38 @@
+---
+description: 卸载百炼 HUD 并恢复安装前的 Claude 状态
+allowed-tools: Bash, Read
+---
+
 # /claude-bailian-hud:uninstall
 
 卸载百炼 HUD 并清理所有相关文件。
 
 ## 清理内容
 
-1. 恢复原始 statusLine 配置
-2. 删除 `~/.claude-bailian-hud/` 目录
-3. 清理当前插件相关缓存
+1. 恢复安装前的 `statusLine`
+2. 从 `settings.json` 里移除 `claude-bailian-hud` 的启用配置
+3. 清理 `installed_plugins.json` 和 `known_marketplaces.json` 中的插件记录
+4. 删除新的运行时目录 `~/.claude/plugins/claude-bailian-hud/`
+5. 删除旧版本遗留目录 `~/.claude-bailian-hud/`
+6. 尝试延迟删除插件 marketplace/cache 目录本身
 
 ## 执行清理
 
 ```bash
-# 1. 恢复原始 statusLine（如果有备份）
-backup_file="$HOME/.claude-bailian-hud/original-statusline.json"
-settings_file="$HOME/.claude/settings.json"
+runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
+[ -n "$runtime" ] || { echo "未找到 bun 或 node"; exit 1; }
 
-if [ -f "$backup_file" ]; then
-  # 读取备份的原始命令
-  original_command=$(cat "$backup_file" | grep -o '"originalCommand": *"[^"]*"' | sed 's/"originalCommand": *"\(.*\)"/\1/' | sed 's/\\n/\n/g')
-  echo "找到原始 statusLine 备份，将恢复..."
-fi
+plugin_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
+[ -n "$plugin_dir" ] || { echo "未找到 claude-bailian-hud 插件安装目录"; exit 1; }
 
-# 2. 删除百炼 HUD 配置目录
-rm -rf "$HOME/.claude-bailian-hud/"
-echo "已删除 ~/.claude-bailian-hud/"
-
-# 3. 删除插件缓存
-rm -rf "$HOME/.claude/plugins/cache/claude-bailian-hud/"
-echo "已删除插件缓存"
-
-echo ""
-echo "卸载完成！"
-echo "请运行 /reload-plugins 或重启 Claude Code"
+"$runtime" "$plugin_dir/dist/uninstall-cli.js"
 ```
 
-## 如果需要手动恢复 statusLine
+## 卸载后的提示
 
-如果上述脚本没有找到备份，你可以手动编辑 `~/.claude/settings.json`：
+提示用户：
 
-对于 claude-hud：
-```json
-"statusLine": {
-  "type": "command",
-  "command": "bash -c 'plugin_dir=$(ls -d \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '\"'\"'{ print $(NF-1) \"\\t\" $(0) }'\"'\"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec \"$(which bun)\" --env-file /dev/null \"${plugin_dir}src/index.ts\"'"
-}
-```
-
-或者完全移除 statusLine 配置恢复默认。
-
-## 提醒
-
-卸载后记得运行：
-- `/reload-plugins` - 重新加载插件
-- 或完全重启 Claude Code
+- 卸载脚本已经尽量把 Claude 状态恢复到安装前
+- 如果 Claude 里还显示旧插件，请执行 `/reload-plugins`
+- 如果列表没有及时刷新，直接重启 Claude Code
+- 如果用户之后还想删掉 GitHub 安装记录，可以再执行 `/plugin uninstall claude-bailian-hud`

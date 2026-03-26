@@ -1,36 +1,22 @@
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-const CACHE_DIR = path.join(os.homedir(), '.claude-bailian-hud');
-const CACHE_FILE = path.join(CACHE_DIR, 'cache.json');
-const FETCH_LOCK_FILE = path.join(CACHE_DIR, 'fetch.lock.json');
+import { readJsonFile, writeJsonFileAtomic } from './fs-utils.js';
+import { ensureRuntimeDir } from './runtime.js';
 const FETCH_LOCK_MAX_AGE_MS = 15 * 60 * 1000;
 export function ensureCacheDir() {
-    if (!fs.existsSync(CACHE_DIR)) {
-        fs.mkdirSync(CACHE_DIR, { recursive: true });
-    }
+    ensureRuntimeDir();
 }
 export function readCache() {
-    try {
-        if (!fs.existsSync(CACHE_FILE)) {
-            return null;
-        }
-        const content = fs.readFileSync(CACHE_FILE, 'utf-8');
-        return JSON.parse(content);
-    }
-    catch {
-        return null;
-    }
+    return readJsonFile(ensureRuntimeDir().cacheFile);
 }
 export function writeCache(data, error, sessionId) {
-    ensureCacheDir();
+    const { cacheFile } = ensureRuntimeDir();
     const cache = {
         data,
         timestamp: Date.now(),
         sessionId,
         error,
     };
-    fs.writeFileSync(CACHE_FILE, JSON.stringify(cache, null, 2), 'utf-8');
+    writeJsonFileAtomic(cacheFile, cache, 0o600);
 }
 // 检查是否是同一会话且缓存有效
 export function isCacheValidForSession(cache, currentSessionId, sessionTimeoutMs) {
@@ -47,10 +33,11 @@ export function isSessionTimeout(cache, sessionTimeoutMs) {
 }
 function readFetchLock() {
     try {
-        if (!fs.existsSync(FETCH_LOCK_FILE)) {
+        const { fetchLockFile } = ensureRuntimeDir();
+        if (!fs.existsSync(fetchLockFile)) {
             return null;
         }
-        const content = fs.readFileSync(FETCH_LOCK_FILE, 'utf-8');
+        const content = fs.readFileSync(fetchLockFile, 'utf-8');
         return JSON.parse(content);
     }
     catch {
@@ -69,8 +56,9 @@ function isProcessAlive(pid) {
 }
 export function releaseFetchLock() {
     try {
-        if (fs.existsSync(FETCH_LOCK_FILE)) {
-            fs.unlinkSync(FETCH_LOCK_FILE);
+        const { fetchLockFile } = ensureRuntimeDir();
+        if (fs.existsSync(fetchLockFile)) {
+            fs.unlinkSync(fetchLockFile);
         }
     }
     catch {
@@ -91,7 +79,7 @@ export function isFetchInProgress(maxAgeMs = FETCH_LOCK_MAX_AGE_MS) {
     return false;
 }
 export function acquireFetchLock(source, maxAgeMs = FETCH_LOCK_MAX_AGE_MS) {
-    ensureCacheDir();
+    const { fetchLockFile } = ensureRuntimeDir();
     if (isFetchInProgress(maxAgeMs)) {
         return false;
     }
@@ -102,7 +90,7 @@ export function acquireFetchLock(source, maxAgeMs = FETCH_LOCK_MAX_AGE_MS) {
     };
     const serialized = JSON.stringify(payload, null, 2);
     try {
-        const fd = fs.openSync(FETCH_LOCK_FILE, 'wx');
+        const fd = fs.openSync(fetchLockFile, 'wx');
         fs.writeFileSync(fd, serialized, 'utf-8');
         fs.closeSync(fd);
         return true;
@@ -113,7 +101,7 @@ export function acquireFetchLock(source, maxAgeMs = FETCH_LOCK_MAX_AGE_MS) {
             if (!isFetchInProgress(maxAgeMs)) {
                 try {
                     releaseFetchLock();
-                    const fd = fs.openSync(FETCH_LOCK_FILE, 'wx');
+                    const fd = fs.openSync(fetchLockFile, 'wx');
                     fs.writeFileSync(fd, serialized, 'utf-8');
                     fs.closeSync(fd);
                     return true;

@@ -7,7 +7,13 @@ allowed-tools: Bash, Read
 
 ## Step 1: 检查配置
 
-读取 `~/.claude-bailian-hud/config.json` 确认账号密码已配置。
+读取 `~/.claude/plugins/claude-bailian-hud/config.json` 确认账号密码已配置。
+
+如果新目录没有配置，也可以提示用户旧版目录会在 setup 时自动迁移：
+
+```bash
+cat "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/claude-bailian-hud/config.json" 2>/dev/null || cat "$HOME/.claude-bailian-hud/config.json" 2>/dev/null
+```
 
 如果未配置，提示用户先运行 `/claude-bailian-hud:setup`。
 
@@ -32,5 +38,6 @@ runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
 ## 注意事项
 
 - 浏览器会自动处理登录
-- 登录状态会保存在 `~/.claude-bailian-hud/browser-state/`
-- 数据缓存在 `~/.claude-bailian-hud/cache.json`
+- 登录状态会保存在 `~/.claude/plugins/claude-bailian-hud/browser-state/`
+- 数据缓存在 `~/.claude/plugins/claude-bailian-hud/cache.json`
+- 老版本遗留的 `~/.claude-bailian-hud/` 会在 setup 时自动迁移

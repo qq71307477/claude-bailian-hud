@@ -1,19 +1,29 @@
 import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import * as path from 'path';
-import * as os from 'os';
 import * as fs from 'fs';
 import type { UsageData } from './types.js';
+import { ensureRuntimeDir } from './runtime.js';
 
 const LOGIN_URL = 'https://bailian.console.aliyun.com/';
 const CODING_PLAN_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=coding-plan#/efm/coding-plan-detail';
 
 // 获取浏览器状态存储路径
 function getBrowserStatePath(): string {
-  const configDir = path.join(os.homedir(), '.claude-bailian-hud');
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
+  const { browserStateDir } = ensureRuntimeDir();
+  if (!fs.existsSync(browserStateDir)) {
+    fs.mkdirSync(browserStateDir, { recursive: true });
   }
-  return path.join(configDir, 'browser-state');
+  return browserStateDir;
+}
+
+async function maybeSaveDebugScreenshot(page: Page, filename: string): Promise<void> {
+  if (process.env.BAILIAN_DEBUG !== '1') {
+    return;
+  }
+
+  const screenshotPath = path.join(getBrowserStatePath(), filename);
+  await page.screenshot({ path: screenshotPath, fullPage: true });
+  console.error('[bailian-hud] 调试截图已保存:', screenshotPath);
 }
 
 // 登录弹窗处理函数
@@ -138,11 +148,6 @@ export async function fetchUsage(username: string, password: string): Promise<Us
     await page.goto(CODING_PLAN_URL, { waitUntil: 'networkidle', timeout: 30000 });
     await page.waitForTimeout(3000);
 
-    // 截图调试（生产环境可移除）
-    // const screenshotPath = path.join(getBrowserStatePath(), 'debug.png');
-    // await page.screenshot({ path: screenshotPath, fullPage: true });
-    // console.error('[bailian-hud] 截图已保存:', screenshotPath);
-
     // 再次检查是否需要登录（Coding Plan 页面可能需要单独登录）
     const needLoginAgain = await page.$('text=登录以使用');
     if (needLoginAgain) {
@@ -166,10 +171,7 @@ export async function fetchUsage(username: string, password: string): Promise<Us
 
       await page.waitForTimeout(5000);
 
-      // 再次截图
-      const screenshotPath2 = path.join(getBrowserStatePath(), 'debug-after-login.png');
-      await page.screenshot({ path: screenshotPath2, fullPage: true });
-      console.error('[bailian-hud] 登录后截图已保存:', screenshotPath2);
+      await maybeSaveDebugScreenshot(page, 'debug-after-login.png');
     }
 
     // 解析用量数据

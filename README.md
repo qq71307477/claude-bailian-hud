@@ -47,6 +47,14 @@
 
 状态栏不会自动弹浏览器刷新数据；只有执行上面的手动刷新命令，或首次 `setup` 时，才会打开浏览器登录百炼。
 
+## 卸载
+
+```
+/claude-bailian-hud:uninstall
+```
+
+卸载命令会尽量恢复安装前的 `statusLine`，并清理插件运行时目录、启用状态和本地 marketplace 记录。
+
 ## 功能
 
 - 显示近5小时、近一周、近一月用量百分比
@@ -56,4 +64,4 @@
 
 ## 说明
 
-本插件需要 Playwright 依赖，首次运行会自动安装浏览器。配置文件存储在 `~/.claude-bailian-hud/` 目录。
+本插件需要 Playwright 依赖，首次运行会自动安装浏览器。运行时文件现在统一存储在 `~/.claude/plugins/claude-bailian-hud/` 目录。旧版本遗留的 `~/.claude-bailian-hud/` 会在 setup 时自动迁移，并在 uninstall 时一并清理。
