@@ -51,17 +51,29 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 
 ## Step 3: 收集账号密码
 
+**重要：** AskUserQuestion 需要 2-4 个选项，用户必须点击「Other」按钮输入自定义文本。
+
 使用 AskUserQuestion 询问用户：
 
-**问题1：**
-- header: "阿里云账号"
-- question: "请输入您的阿里云账号（手机号）"
-- 类型：自由文本输入（选择 "Other"）
+**问题1 - 手机号：**
+- header: "手机号"
+- question: "请点击下方「Other」按钮输入您的阿里云账号（手机号）"
+- options:
+  - label: "👉 点下方 Other 按钮"
+    description: "必须点「Other」才能输入手机号"
+  - label: "我已了解"
+    description: "同样需要点「Other」输入"
 
-**问题2：**
-- header: "阿里云密码"
-- question: "请输入您的阿里云密码"
-- 类型：自由文本输入（选择 "Other"）
+**问题2 - 密码：**
+- header: "密码"
+- question: "请点击下方「Other」按钮输入您的阿里云密码"
+- options:
+  - label: "👉 点下方 Other 按钮"
+    description: "必须点「Other」才能输入密码"
+  - label: "我已了解"
+    description: "同样需要点「Other」输入"
+
+**注意：** 直接输入数字会被当作选择选项，必须先点击「Other」按钮！
 
 ## Step 4: 保存配置
 
