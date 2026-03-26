@@ -13,7 +13,7 @@ function getSessionId() {
 async function main() {
     const config = readConfig();
     if (!config) {
-        console.error('[bailian-hud] 错误: 未配置账号密码，请先运行 /bailian-hud:setup');
+        console.error('[bailian-hud] 错误: 未配置账号密码，请先运行 /claude-bailian-hud:setup');
         process.exit(1);
     }
     const sessionId = getSessionId();

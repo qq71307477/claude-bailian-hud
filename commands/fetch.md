@@ -7,19 +7,19 @@ allowed-tools: Bash, Read
 
 ## Step 1: 检查配置
 
-读取 `~/.bailian-hud/config.json` 确认账号密码已配置。
+读取 `~/.claude-bailian-hud/config.json` 确认账号密码已配置。
 
-如果未配置，提示用户先运行 `/bailian-hud:setup`。
+如果未配置，提示用户先运行 `/claude-bailian-hud:setup`。
 
 ## Step 2: 执行抓取
 
 获取插件安装路径并执行 fetch：
 
 ```bash
-bailian_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/bailian-hud/bailian-hud/*
+bailian_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*
 bailian_dir=$(ls -d $bailian_dir 2>/dev/null | sort -V | tail -1)
 runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
-"$runtime" "$bailian_dir/dist/fetcher.js"
+"$runtime" "$bailian_dir/dist/fetch-cli.js"
 ```
 
 ## Step 3: 提示用户
@@ -31,5 +31,5 @@ runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
 ## 注意事项
 
 - 浏览器会自动处理登录
-- 登录状态会保存在 `~/.bailian-hud/browser-state/`
-- 数据缓存在 `~/.bailian-hud/cache.json`
+- 登录状态会保存在 `~/.claude-bailian-hud/browser-state/`
+- 数据缓存在 `~/.claude-bailian-hud/cache.json`

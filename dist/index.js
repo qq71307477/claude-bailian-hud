@@ -41,7 +41,7 @@ async function main() {
             console.log(render(cache.data));
         }
         else if (cache?.error) {
-            console.log(render(null, '数据获取失败，运行 /bailian-hud:fetch 重试'));
+            console.log(render(null, '数据获取失败，运行 /claude-bailian-hud:fetch 重试'));
         }
         else {
             console.log(render(null, '正在获取数据...'));

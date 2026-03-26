@@ -23,7 +23,12 @@
 /claude-bailian-hud:setup
 ```
 
-输入阿里云账号密码后，自动配置 statusLine。
+按命令提示用固定格式输入阿里云手机号和密码后，自动配置 statusLine。回复时不要只发纯手机号数字，请使用：
+
+```text
+手机号: 13800138000
+密码: your-password
+```
 
 ## 显示效果
 

@@ -1,4 +1,4 @@
-# /bailian-hud:uninstall
+# /claude-bailian-hud:uninstall
 
 卸载百炼 HUD 并清理所有相关文件。
 
@@ -6,7 +6,7 @@
 
 1. 恢复原始 statusLine 配置
 2. 删除 `~/.claude-bailian-hud/` 目录
-3. 从 settings.json 移除 extraKnownMarketplaces 中的 bailian-hud
+3. 清理当前插件相关缓存
 
 ## 执行清理
 

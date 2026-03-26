@@ -1,6 +1,6 @@
 ---
 description: 配置百炼 HUD - 设置账号密码并启用 statusLine
-allowed-tools: Bash, Read, Write, AskUserQuestion
+allowed-tools: Bash, Read, Write
 ---
 
 # 配置百炼 HUD
@@ -25,17 +25,12 @@ command -v bun 2>/dev/null || command -v node 2>/dev/null
 cat ~/.claude-bailian-hud/config.json 2>/dev/null
 ```
 
-**如果已存在配置**：使用 AskUserQuestion 询问用户：
+**如果已存在配置**：不要使用 AskUserQuestion，也不要显示数字选项。
 
-- header: "已配置"
-- question: "检测到已有账号配置，是否要更新账号密码？"
-- options:
-  - label: "保持现有配置"
-    description: "不修改，直接退出"
-  - label: "重新配置"
-    description: "覆盖现有账号密码"
+直接告诉用户：
 
-如果用户选择"保持现有配置"，直接结束，提示用户运行 `/bailian-hud:fetch` 刷新数据。
+> 检测到已有账号配置。本次 `/claude-bailian-hud:setup` 会覆盖旧的手机号和密码。
+> 如果您不想修改，停止继续回复即可；如果要更新，请按后面的固定格式发送。
 
 ## Step 3: 创建 statusLine 脚本
 
@@ -62,6 +57,14 @@ fi
 
 **如果原有 statusLine 存在**：提取其中的 HUD 命令（去掉 `exec`），放入脚本
 
+**如果原有 statusLine 存在**：同时备份到 `~/.claude-bailian-hud/original-statusline.json`，格式如下：
+
+```json
+{
+  "originalCommand": "原始 statusLine command"
+}
+```
+
 **如果原有 statusLine 不存在**：该部分留空
 
 赋予执行权限：
@@ -71,19 +74,39 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 
 ## Step 4: 收集账号密码
 
-**直接询问用户账号密码，让用户在对话中回复。**
+**直接在对话中收集账号密码，但必须要求用户按固定格式回复，不能只发手机号数字。**
 
 输出提示：
 
 > 脚本已创建。现在需要您的阿里云账号信息。
 >
-> 请直接在对话中告诉我：
-> - 手机号：您的阿里云账号（手机号）
-> - 密码：您的阿里云密码
+> 请直接复制下面的模板并填写后整段发送：
+>
+> ```text
+> 手机号: 13800138000
+> 密码: your-password
+> ```
+>
+> 注意：
+> - 不要只发送手机号数字，否则在 Claude 中可能被当成选项输入
+> - 第一行必须以 `手机号:` 开头
+> - 第二行必须以 `密码:` 开头
+> - 如果密码里有空格或特殊字符，保持原样放在 `密码:` 后面即可
 
 等待用户回复，然后解析手机号和密码。
 
-**注意：** 不要使用 AskUserQuestion，直接在对话中询问，用户回复后提取信息即可。
+解析规则：
+
+- 只从 `手机号:` 这一行提取账号
+- 只从 `密码:` 这一行提取密码
+- 手机号必须匹配 `^1\d{10}$`
+- 密码不能为空
+
+如果格式不对或校验失败：
+
+- 不要猜测
+- 不要使用 AskUserQuestion
+- 直接提示用户重新按同一模板发送
 
 ## Step 5: 保存配置
 
@@ -117,7 +140,7 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 执行 fetch-cli.js 进行首次数据抓取：
 
 ```bash
-bailian_dir=$(ls -d ~/.claude/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
+bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
 {RUNTIME_PATH} "${bailian_dir}dist/fetch-cli.js"
 ```
 
