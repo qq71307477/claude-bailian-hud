@@ -5,7 +5,7 @@ import { fetchUsage, ManualInterventionRequiredError } from './fetcher.js';
 import { getSessionId } from './session.js';
 function getFetchSource() {
     const source = process.env.BAILIAN_FETCH_SOURCE;
-    if (source === 'setup' || source === 'manual') {
+    if (source === 'background' || source === 'setup' || source === 'manual') {
         return source;
     }
     return 'manual';
@@ -22,7 +22,7 @@ async function main() {
     const hasLock = process.env.BAILIAN_FETCH_LOCK_HELD === '1'
         ? true
         : acquireFetchLock(source);
-    const headlessOnly = source === 'setup';
+    const headlessOnly = source === 'setup' || source === 'background';
     const manualHeadlessFirst = source === 'manual';
     if (!hasLock) {
         console.error('[bailian-hud] 已有刷新任务在运行，跳过重复抓取');
@@ -54,7 +54,9 @@ async function main() {
         const message = error instanceof Error ? error.message : '刷新失败';
         console.error('[bailian-hud] 刷新失败:', message);
         writeCache(cache?.data ?? null, message, sessionId);
-        process.exitCode = 1;
+        if (source !== 'background') {
+            process.exitCode = 1;
+        }
     }
     finally {
         releaseFetchLock();

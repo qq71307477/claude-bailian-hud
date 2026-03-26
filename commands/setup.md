@@ -128,6 +128,6 @@ BAILIAN_FETCH_SOURCE=setup "{RUNTIME_PATH}" "${bailian_dir}dist/fetch-cli.js"
 > [Haiku] ████░░░░░ 32% | pro git:(main*)     ← 原有 HUD（下方）
 > ```
 >
-> setup 会先尝试一次无头抓取；之后不会自动刷新，手动同步请运行：`/claude-bailian-hud:fetch`
+> setup 会先尝试一次无头抓取；后续每次新会话开始时会再无头同步一次，手动同步请运行：`/claude-bailian-hud:fetch`
 >
 > 如果以后要彻底恢复安装前状态，请先运行：`/claude-bailian-hud:uninstall`

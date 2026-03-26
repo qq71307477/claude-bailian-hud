@@ -1,8 +1,40 @@
 #!/usr/bin/env node
+import { spawn } from 'child_process';
 import { readConfig } from './config.js';
-import { readCache } from './cache.js';
+import { acquireFetchLock, isFetchInProgress, readCache, releaseFetchLock, } from './cache.js';
 import { render } from './render.js';
-function getRenderNote(cacheError) {
+import { getSessionId } from './session.js';
+function shouldTriggerSessionStartFetch(cacheSessionId, currentSessionId) {
+    if (!currentSessionId) {
+        return false;
+    }
+    return cacheSessionId !== currentSessionId;
+}
+function triggerSessionStartFetch() {
+    if (!acquireFetchLock('background')) {
+        return false;
+    }
+    const runtime = process.argv[1];
+    const fetcherPath = runtime.replace('index.js', 'fetch-cli.js');
+    const child = spawn(process.execPath, [fetcherPath], {
+        detached: true,
+        stdio: 'ignore',
+        env: {
+            ...process.env,
+            BAILIAN_FETCH_SOURCE: 'background',
+            BAILIAN_FETCH_LOCK_HELD: '1',
+        },
+    });
+    child.on('error', () => {
+        releaseFetchLock();
+    });
+    child.unref();
+    return true;
+}
+function getRenderNote(cacheError, sessionRefreshing) {
+    if (sessionRefreshing) {
+        return '会话同步中';
+    }
     if (!cacheError) {
         return undefined;
     }
@@ -19,7 +51,12 @@ async function main() {
             return;
         }
         const cache = readCache();
-        const note = getRenderNote(cache?.error);
+        const currentSessionId = getSessionId();
+        let sessionRefreshing = isFetchInProgress();
+        if (!sessionRefreshing && shouldTriggerSessionStartFetch(cache?.sessionId, currentSessionId)) {
+            sessionRefreshing = triggerSessionStartFetch();
+        }
+        const note = getRenderNote(cache?.error, sessionRefreshing);
         if (cache?.data) {
             console.log(render(cache.data, undefined, note));
         }
@@ -27,7 +64,7 @@ async function main() {
             console.log(render(null, cache.error));
         }
         else {
-            console.log(render(null, '未获取数据，运行 /claude-bailian-hud:fetch'));
+            console.log(render(null, sessionRefreshing ? '正在同步本会话数据...' : '未获取数据，运行 /claude-bailian-hud:fetch'));
         }
     }
     catch (error) {

@@ -13,7 +13,7 @@ export interface UsageData {
 export interface Cache {
   data: UsageData | null;
   timestamp: number;
-  sessionId?: string;     // 会话ID，用于判断是否同一会话
+  sessionId?: string;     // Claude 会话ID，用于会话开启时同步一次
   error?: string;
 }
 

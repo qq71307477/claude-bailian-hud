@@ -34,7 +34,7 @@ runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
 - 如遇到滑块验证，请手动完成
 - 插件会直接打开百炼控制台的 `Coding Plan` 详情页抓取，不再先跳首页
 - 抓取完成后数据会缓存，statusLine 下次刷新时显示
-- statusLine 本身不会自动刷新；只有 setup 首抓和这个手动刷新命令会更新缓存
+- statusLine 不会按时间轮询刷新；只有 setup 首抓、每次新会话开始时的一次无头同步，以及这个手动刷新命令会更新缓存
 
 ## 注意事项
 
