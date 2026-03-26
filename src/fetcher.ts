@@ -25,14 +25,20 @@ async function doLoginInDialog(page: Page, username: string, password: string): 
   const loginFrame = page.frameLocator('iframe[title="login"]')
     .frameLocator('#alibaba-login-iframe #alibaba-login-box');
 
-  // 填写账号
+  // 填写账号 - 使用 pressSequentially 逐字符输入避免自动完成问题
   const usernameInput = loginFrame.locator('#fm-login-id');
-  await usernameInput.fill(username);
+  await usernameInput.click();
+  await usernameInput.clear();
+  await page.waitForTimeout(300);
+  await usernameInput.pressSequentially(username, { delay: 50 }); // 50ms 延迟模拟人工输入
   await page.waitForTimeout(500);
 
-  // 填写密码
+  // 填写密码 - 使用 pressSequentially 逐字符输入
   const passwordInput = loginFrame.locator('#fm-login-password');
-  await passwordInput.fill(password);
+  await passwordInput.click();
+  await passwordInput.clear();
+  await page.waitForTimeout(300);
+  await passwordInput.pressSequentially(password, { delay: 50 });
   await page.waitForTimeout(500);
 
   // 点击登录按钮
