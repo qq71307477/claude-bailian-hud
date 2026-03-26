@@ -8,6 +8,13 @@ export function ensureCacheDir() {
 export function readCache() {
     return readJsonFile(ensureRuntimeDir().cacheFile);
 }
+export function readStatuslineState() {
+    return readJsonFile(ensureRuntimeDir().statuslineStateFile);
+}
+export function writeStatuslineState(state) {
+    const { statuslineStateFile } = ensureRuntimeDir();
+    writeJsonFileAtomic(statuslineStateFile, state, 0o600);
+}
 export function writeCache(data, error, sessionId) {
     const { cacheFile } = ensureRuntimeDir();
     const cache = {

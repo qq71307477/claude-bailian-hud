@@ -17,6 +17,10 @@ export interface Cache {
   error?: string;
 }
 
+export interface StatuslineState {
+  lastSeenAt: number;
+}
+
 // 配置
 export interface Config {
   username: string;

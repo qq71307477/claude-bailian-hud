@@ -5,20 +5,37 @@ import {
   acquireFetchLock,
   isFetchInProgress,
   readCache,
+  readStatuslineState,
   releaseFetchLock,
+  writeStatuslineState,
 } from './cache.js';
 import { render } from './render.js';
 import { getSessionId } from './session.js';
 
+const SESSION_FALLBACK_IDLE_MS = 30 * 1000;
+const STATUSLINE_STATE_WRITE_INTERVAL_MS = 5 * 1000;
+
 function shouldTriggerSessionStartFetch(
   cacheSessionId: string | undefined,
   currentSessionId: string | undefined,
+  lastSeenAt: number | undefined,
+  now: number,
 ): boolean {
-  if (!currentSessionId) {
-    return false;
+  if (currentSessionId) {
+    return cacheSessionId !== currentSessionId;
   }
 
-  return cacheSessionId !== currentSessionId;
+  if (!lastSeenAt) {
+    return true;
+  }
+
+  return now - lastSeenAt >= SESSION_FALLBACK_IDLE_MS;
+}
+
+function persistStatuslineSeenAt(lastSeenAt: number | undefined, now: number): void {
+  if (!lastSeenAt || now - lastSeenAt >= STATUSLINE_STATE_WRITE_INTERVAL_MS) {
+    writeStatuslineState({ lastSeenAt: now });
+  }
 }
 
 function triggerSessionStartFetch(): boolean {
@@ -75,10 +92,20 @@ async function main() {
     }
 
     const cache = readCache();
+    const statuslineState = readStatuslineState();
     const currentSessionId = getSessionId();
+    const now = Date.now();
     let sessionRefreshing = isFetchInProgress();
 
-    if (!sessionRefreshing && shouldTriggerSessionStartFetch(cache?.sessionId, currentSessionId)) {
+    const shouldRefreshForSessionStart = shouldTriggerSessionStartFetch(
+      cache?.sessionId,
+      currentSessionId,
+      statuslineState?.lastSeenAt,
+      now,
+    );
+    persistStatuslineSeenAt(statuslineState?.lastSeenAt, now);
+
+    if (!sessionRefreshing && shouldRefreshForSessionStart) {
       sessionRefreshing = triggerSessionStartFetch();
     }
 

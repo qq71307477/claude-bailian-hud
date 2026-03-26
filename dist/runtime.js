@@ -16,6 +16,7 @@ export function getRuntimePaths() {
         legacyRuntimeDir: path.join(os.homedir(), '.claude-bailian-hud'),
         configFile: path.join(runtimeDir, 'config.json'),
         cacheFile: path.join(runtimeDir, 'cache.json'),
+        statuslineStateFile: path.join(runtimeDir, 'statusline-state.json'),
         fetchLockFile: path.join(runtimeDir, 'fetch.lock.json'),
         browserStateDir: path.join(runtimeDir, 'browser-state'),
         installStateFile: path.join(runtimeDir, 'install-state.json'),

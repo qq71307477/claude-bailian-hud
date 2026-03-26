@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import type { Cache, UsageData } from './types.js';
+import type { Cache, StatuslineState, UsageData } from './types.js';
 import { readJsonFile, writeJsonFileAtomic } from './fs-utils.js';
 import { ensureRuntimeDir } from './runtime.js';
 
@@ -17,6 +17,15 @@ export function ensureCacheDir(): void {
 
 export function readCache(): Cache | null {
   return readJsonFile<Cache>(ensureRuntimeDir().cacheFile);
+}
+
+export function readStatuslineState(): StatuslineState | null {
+  return readJsonFile<StatuslineState>(ensureRuntimeDir().statuslineStateFile);
+}
+
+export function writeStatuslineState(state: StatuslineState): void {
+  const { statuslineStateFile } = ensureRuntimeDir();
+  writeJsonFileAtomic(statuslineStateFile, state, 0o600);
 }
 
 export function writeCache(data: UsageData | null, error?: string, sessionId?: string): void {
