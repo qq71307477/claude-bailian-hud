@@ -4,6 +4,15 @@
 
 ## 安装
 
+**方式1：Marketplace 安装（推荐）**
+
+```
+/plugin marketplace add qq71307477/claude-bailian-hud
+/plugin install claude-bailian-hud
+```
+
+**方式2：直接安装**
+
 ```
 /plugin install github:qq71307477/claude-bailian-hud
 ```
@@ -21,8 +30,8 @@
 百炼用量显示在最上方，与其他 HUD 并存：
 
 ```
-[Lite] 5h: 26% │ 周: 48% │ 月: 39%          ← 百炼
-[Haiku] ████░░░░░ 32% | pro git:(main*)     ← 其他 HUD
+[Lite] 5h: 26% │ 周: 48% │ 月: 39%          ← 百炼（上方）
+[Haiku] ████░░░░░ 32% | pro git:(main*)     ← 其他 HUD（下方）
 ```
 
 ## 手动刷新数据
@@ -36,4 +45,8 @@
 - 显示近5小时、近一周、近一月用量百分比
 - 显示重置时间
 - 会话级缓存，减少刷新频率
-- 与其他 statusLine 插件并存
+- 与其他 statusLine 插件并存（百炼显示在最上方）
+
+## 说明
+
+本插件需要 Playwright 依赖，首次运行会自动安装浏览器。配置文件存储在 `~/.claude-bailian-hud/` 目录。
