@@ -17,7 +17,27 @@ command -v bun 2>/dev/null || command -v node 2>/dev/null
 
 保存运行时路径为 `{RUNTIME_PATH}`。
 
-## Step 2: 创建 statusLine 脚本
+## Step 2: 检查现有配置
+
+读取 `~/.claude-bailian-hud/config.json`：
+
+```bash
+cat ~/.claude-bailian-hud/config.json 2>/dev/null
+```
+
+**如果已存在配置**：使用 AskUserQuestion 询问用户：
+
+- header: "已配置"
+- question: "检测到已有账号配置，是否要更新账号密码？"
+- options:
+  - label: "保持现有配置"
+    description: "不修改，直接退出"
+  - label: "重新配置"
+    description: "覆盖现有账号密码"
+
+如果用户选择"保持现有配置"，直接结束，提示用户运行 `/bailian-hud:fetch` 刷新数据。
+
+## Step 3: 创建 statusLine 脚本
 
 创建目录：
 ```bash
@@ -49,7 +69,7 @@ fi
 chmod +x ~/.claude-bailian-hud/statusline.sh
 ```
 
-## Step 3: 收集账号密码
+## Step 4: 收集账号密码
 
 **重要：** AskUserQuestion 需要 2-4 个选项，用户必须点击「Other」按钮输入自定义文本。
 
@@ -75,7 +95,7 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 
 **注意：** 直接输入数字会被当作选择选项，必须先点击「Other」按钮！
 
-## Step 4: 保存配置
+## Step 5: 保存配置
 
 写入 `~/.claude-bailian-hud/config.json`：
 
@@ -87,7 +107,7 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 }
 ```
 
-## Step 5: 更新 settings.json
+## Step 6: 更新 settings.json
 
 读取 `~/.claude/settings.json`，更新 statusLine：
 
@@ -102,7 +122,7 @@ chmod +x ~/.claude-bailian-hud/statusline.sh
 
 保留所有现有配置，只更新 statusLine 部分。
 
-## Step 6: 首次抓取数据
+## Step 7: 首次抓取数据
 
 执行 fetch-cli.js 进行首次数据抓取：
 
@@ -113,7 +133,7 @@ bailian_dir=$(ls -d ~/.claude/plugins/cache/claude-bailian-hud/claude-bailian-hu
 
 提示用户可能需要在弹出的浏览器窗口中完成滑块验证。
 
-## Step 7: 完成提示
+## Step 8: 完成提示
 
 告知用户：
 
