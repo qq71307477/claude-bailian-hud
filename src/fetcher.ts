@@ -218,17 +218,30 @@ async function parseUsageData(page: Page): Promise<UsageData> {
     const planNameMatch = bodyText.match(/(Lite|Pro)(基础|高级)?套餐/);
     const planName = planNameMatch ? planNameMatch[1] : 'Lite';
 
-    // 解析百分比 - 找到所有百分比数字，过滤掉进度条刻度 (0%, 50%, 90%, 100%)
-    const allPercents = bodyText.match(/(\d+)%/g) || [];
-    // 过滤掉进度条刻度，只保留实际用量
-    const scaleMarks = ['0%', '50%', '90%', '100%'];
-    const usagePercents = allPercents.filter(p => !scaleMarks.includes(p));
-    console.error('[bailian-hud] 过滤后用量百分比:', usagePercents);
+    // 解析百分比 - 按位置查找每个用量区域的百分比
+    // 页面结构：近5小时用量 -> 百分比 -> 近一周用量 -> 百分比 -> 近一月用量 -> 百分比
+    const sections = bodyText.split(/近(?:5小时|一周|一月)用量/);
+    const usagePercents: number[] = [];
 
-    // 假设第一个是5小时，第二个是周，第三个是月
-    const fiveHour = usagePercents[0] ? parseInt(usagePercents[0], 10) : 0;
-    const week = usagePercents[1] ? parseInt(usagePercents[1], 10) : 0;
-    const month = usagePercents[2] ? parseInt(usagePercents[2], 10) : 0;
+    for (let i = 1; i < sections.length && usagePercents.length < 3; i++) {
+      const section = sections[i];
+      // 在每个区域找第一个百分比数字（跳过进度条刻度 0%）
+      const percents = section.match(/(\d+)%/g) || [];
+      for (const p of percents) {
+        const val = parseInt(p, 10);
+        // 跳过进度条刻度 0%，其他都可能是实际用量
+        if (val > 0) {
+          usagePercents.push(val);
+          break;
+        }
+      }
+    }
+
+    console.error('[bailian-hud] 解析用量百分比:', usagePercents);
+
+    const fiveHour = usagePercents[0] || 0;
+    const week = usagePercents[1] || 0;
+    const month = usagePercents[2] || 0;
 
     // 解析重置时间
     const resetTimes = bodyText.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*重置/g) || [];
