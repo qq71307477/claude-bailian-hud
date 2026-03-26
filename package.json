@@ -1,0 +1,22 @@
+{
+  "name": "claude-bailian-hud",
+  "version": "0.0.1",
+  "description": "百炼 Coding Plan 用量监控 - Claude Code statusLine 插件",
+  "type": "module",
+  "main": "dist/index.js",
+  "files": [
+    "dist/",
+    "src/",
+    "commands/",
+    ".claude-plugin/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.37",
+    "playwright": "^1.58.2",
+    "typescript": "^5.0.0"
+  }
+}
