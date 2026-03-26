@@ -1,6 +1,19 @@
 {
-  "source": {
-    "source": "github",
-    "repo": "qq71307477/claude-bailian-hud"
-  }
+  "name": "claude-bailian-hud",
+  "owner": {
+    "name": "zq"
+  },
+  "metadata": {
+    "description": "百炼 Coding Plan 用量监控 - 显示5小时/周/月用量百分比",
+    "version": "0.0.1"
+  },
+  "plugins": [
+    {
+      "name": "claude-bailian-hud",
+      "source": "./",
+      "description": "百炼 Coding Plan 用量监控，显示近5小时/周/月用量百分比，与其他 statusLine 插件并存",
+      "category": "monitoring",
+      "tags": ["bailian", "statusline", "usage", "hud", "monitoring"]
+    }
+  ]
 }
