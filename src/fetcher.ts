@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import type { UsageData } from './types.js';
 import { ensureRuntimeDir } from './runtime.js';
 
-const FREE_QUOTA_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=model#/model-usage/free-quota';
+const CODING_PLAN_DETAIL_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=coding-plan#/efm/coding-plan-detail';
 const USAGE_MARKERS = ['近5小时用量', '近一周用量', '近一月用量'];
 
 // 获取浏览器状态存储路径
@@ -72,7 +72,7 @@ async function needsLogin(page: Page): Promise<boolean> {
 
 async function openUsagePage(page: Page, reason: string): Promise<void> {
   console.error(`[bailian-hud] ${reason}...`);
-  await page.goto(FREE_QUOTA_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.goto(CODING_PLAN_DETAIL_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitForPageSettled(page);
 }
 
@@ -134,19 +134,19 @@ async function doLogin(page: Page, username: string, password: string): Promise<
 }
 
 async function ensureUsagePage(page: Page, username: string, password: string): Promise<void> {
-  await openUsagePage(page, '直接打开免费额度页面');
+  await openUsagePage(page, '直接打开 Coding Plan 详情页');
 
   if (await isUsagePageReady(page)) {
-    console.error('[bailian-hud] 免费额度页面已就绪');
+    console.error('[bailian-hud] Coding Plan 详情页已就绪');
     return;
   }
 
   if (!(await needsLogin(page))) {
-    await maybeSaveDebugScreenshot(page, 'free-quota-not-ready.png');
-    throw new Error('已打开 free-quota 页面，但未识别到用量数据');
+    await maybeSaveDebugScreenshot(page, 'coding-plan-not-ready.png');
+    throw new Error('已打开 Coding Plan 详情页，但未识别到用量数据');
   }
 
-  console.error('[bailian-hud] 免费额度页面需要登录...');
+  console.error('[bailian-hud] Coding Plan 详情页需要登录...');
 
   const loginNowButton = await page.$('button:has-text("立即登录")');
   if (loginNowButton) {
@@ -157,15 +157,15 @@ async function ensureUsagePage(page: Page, username: string, password: string): 
     await doLogin(page, username, password);
   }
 
-  await openUsagePage(page, '登录后重新打开免费额度页面');
+  await openUsagePage(page, '登录后重新打开 Coding Plan 详情页');
 
   if (await isUsagePageReady(page)) {
-    console.error('[bailian-hud] 登录后已进入免费额度页面');
+    console.error('[bailian-hud] 登录后已进入 Coding Plan 详情页');
     return;
   }
 
-  await maybeSaveDebugScreenshot(page, 'free-quota-not-ready-after-login.png');
-  throw new Error('登录后仍未进入 free-quota 页面');
+  await maybeSaveDebugScreenshot(page, 'coding-plan-not-ready-after-login.png');
+  throw new Error('登录后仍未进入 Coding Plan 详情页');
 }
 
 export async function fetchUsage(username: string, password: string): Promise<UsageData> {
@@ -244,7 +244,7 @@ async function parseUsageData(page: Page): Promise<UsageData> {
     console.error('[bailian-hud] 页面文本前500字符:', bodyText.substring(0, 500));
 
     if (!hasUsageMarkers(bodyText)) {
-      throw new Error('free-quota 页面未出现近5小时/周/月用量区块');
+      throw new Error('Coding Plan 详情页未出现近5小时/周/月用量区块');
     }
 
     // 调试：打印包含关键词的行
