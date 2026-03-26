@@ -2,8 +2,8 @@ import { chromium } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ensureRuntimeDir } from './runtime.js';
-const LOGIN_URL = 'https://bailian.console.aliyun.com/';
-const CODING_PLAN_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=coding-plan#/efm/coding-plan-detail';
+const FREE_QUOTA_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=model#/model-usage/free-quota';
+const USAGE_MARKERS = ['近5小时用量', '近一周用量', '近一月用量'];
 // 获取浏览器状态存储路径
 function getBrowserStatePath() {
     const { browserStateDir } = ensureRuntimeDir();
@@ -19,6 +19,48 @@ async function maybeSaveDebugScreenshot(page, filename) {
     const screenshotPath = path.join(getBrowserStatePath(), filename);
     await page.screenshot({ path: screenshotPath, fullPage: true });
     console.error('[bailian-hud] 调试截图已保存:', screenshotPath);
+}
+async function waitForPageSettled(page, delayMs = 3000) {
+    try {
+        await page.waitForLoadState('networkidle', { timeout: 15000 });
+    }
+    catch {
+        // 百炼控制台是 SPA，networkidle 不稳定时退回固定等待
+    }
+    await page.waitForTimeout(delayMs);
+}
+async function getBodyText(page) {
+    return page.evaluate(() => document.body.innerText);
+}
+function hasUsageMarkers(bodyText) {
+    return USAGE_MARKERS.every((marker) => bodyText.includes(marker));
+}
+async function isUsagePageReady(page) {
+    try {
+        const bodyText = await getBodyText(page);
+        return hasUsageMarkers(bodyText);
+    }
+    catch {
+        return false;
+    }
+}
+async function needsLogin(page) {
+    if (await page.locator('iframe[title="login"]').count() > 0) {
+        return true;
+    }
+    const bodyText = await getBodyText(page).catch(() => '');
+    if (bodyText.includes('登录以使用')) {
+        return true;
+    }
+    if (hasUsageMarkers(bodyText)) {
+        return false;
+    }
+    return bodyText.includes('立即登录') || bodyText.includes('阿里云账号');
+}
+async function openUsagePage(page, reason) {
+    console.error(`[bailian-hud] ${reason}...`);
+    await page.goto(FREE_QUOTA_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await waitForPageSettled(page);
 }
 // 登录弹窗处理函数
 async function doLoginInDialog(page, username, password) {
@@ -66,6 +108,34 @@ async function doLogin(page, username, password) {
     // 调用通用的弹窗登录函数
     await doLoginInDialog(page, username, password);
 }
+async function ensureUsagePage(page, username, password) {
+    await openUsagePage(page, '直接打开免费额度页面');
+    if (await isUsagePageReady(page)) {
+        console.error('[bailian-hud] 免费额度页面已就绪');
+        return;
+    }
+    if (!(await needsLogin(page))) {
+        await maybeSaveDebugScreenshot(page, 'free-quota-not-ready.png');
+        throw new Error('已打开 free-quota 页面，但未识别到用量数据');
+    }
+    console.error('[bailian-hud] 免费额度页面需要登录...');
+    const loginNowButton = await page.$('button:has-text("立即登录")');
+    if (loginNowButton) {
+        await loginNowButton.click();
+        await page.waitForTimeout(2000);
+        await doLoginInDialog(page, username, password);
+    }
+    else {
+        await doLogin(page, username, password);
+    }
+    await openUsagePage(page, '登录后重新打开免费额度页面');
+    if (await isUsagePageReady(page)) {
+        console.error('[bailian-hud] 登录后已进入免费额度页面');
+        return;
+    }
+    await maybeSaveDebugScreenshot(page, 'free-quota-not-ready-after-login.png');
+    throw new Error('登录后仍未进入 free-quota 页面');
+}
 export async function fetchUsage(username, password) {
     let browser = null;
     let context = null;
@@ -107,46 +177,7 @@ export async function fetchUsage(username, password) {
             console.error('[bailian-hud] 创建新的浏览器上下文');
         }
         const page = await context.newPage();
-        // 导航到控制台页面
-        console.error('[bailian-hud] 导航到控制台...');
-        await page.goto(LOGIN_URL, { waitUntil: 'networkidle', timeout: 30000 });
-        await page.waitForTimeout(3000);
-        // 检查是否已登录
-        const isLoggedIn = await checkIsLoggedIn(page);
-        if (!isLoggedIn) {
-            console.error('[bailian-hud] 需要登录...');
-            await doLogin(page, username, password);
-        }
-        else {
-            console.error('[bailian-hud] 已登录');
-        }
-        // 导航到 Coding Plan 页面
-        console.error('[bailian-hud] 导航到 Coding Plan 页面...');
-        await page.goto(CODING_PLAN_URL, { waitUntil: 'networkidle', timeout: 30000 });
-        await page.waitForTimeout(3000);
-        // 再次检查是否需要登录（Coding Plan 页面可能需要单独登录）
-        const needLoginAgain = await page.$('text=登录以使用');
-        if (needLoginAgain) {
-            console.error('[bailian-hud] Coding Plan 页面需要重新登录...');
-            // 点击"立即登录"按钮
-            const loginNowButton = await page.$('button:has-text("立即登录")');
-            if (loginNowButton) {
-                await loginNowButton.click();
-                await page.waitForTimeout(2000);
-                await doLoginInDialog(page, username, password);
-            }
-            else {
-                // 点击顶部的登录按钮
-                const topLoginButton = await page.$('text=登录');
-                if (topLoginButton) {
-                    await topLoginButton.click();
-                    await page.waitForTimeout(2000);
-                    await doLoginInDialog(page, username, password);
-                }
-            }
-            await page.waitForTimeout(5000);
-            await maybeSaveDebugScreenshot(page, 'debug-after-login.png');
-        }
+        await ensureUsagePage(page, username, password);
         // 解析用量数据
         console.error('[bailian-hud] 解析用量数据...');
         const usageData = await parseUsageData(page);
@@ -165,24 +196,15 @@ export async function fetchUsage(username, password) {
         }
     }
 }
-async function checkIsLoggedIn(page) {
-    try {
-        // 检查是否有"登录"按钮，如果没有则已登录
-        const loginButton = await page.$('text=登录');
-        return !loginButton;
-    }
-    catch {
-        return false;
-    }
-}
 async function parseUsageData(page) {
-    // 等待数据加载 - 增加等待时间
-    await page.waitForTimeout(5000);
+    await waitForPageSettled(page, 5000);
     try {
-        // 获取整个页面的文本内容
-        const bodyText = await page.evaluate(() => document.body.innerText);
+        const bodyText = await getBodyText(page);
         console.error('[bailian-hud] 页面文本长度:', bodyText.length);
         console.error('[bailian-hud] 页面文本前500字符:', bodyText.substring(0, 500));
+        if (!hasUsageMarkers(bodyText)) {
+            throw new Error('free-quota 页面未出现近5小时/周/月用量区块');
+        }
         // 调试：打印包含关键词的行
         const lines = bodyText.split('\n');
         for (const line of lines) {
@@ -249,14 +271,7 @@ async function parseUsageData(page) {
     }
     catch (error) {
         console.error('[bailian-hud] 解析错误:', error);
-        return {
-            planName: 'Lite',
-            fiveHour: 0,
-            fiveHourReset: '',
-            week: 0,
-            weekReset: '',
-            month: 0,
-            monthReset: '',
-        };
+        await maybeSaveDebugScreenshot(page, 'parse-error.png');
+        throw error;
     }
 }

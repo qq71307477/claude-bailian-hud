@@ -1,6 +1,6 @@
 # Claude Bailian HUD
 
-百炼 Coding Plan 用量监控插件，用于 Claude Code statusLine。
+百炼免费额度页面用量监控插件，用于 Claude Code statusLine。
 
 ## 安装
 
@@ -45,7 +45,7 @@
 /claude-bailian-hud:fetch
 ```
 
-状态栏不会自动弹浏览器刷新数据；只有执行上面的手动刷新命令，或首次 `setup` 时，才会打开浏览器登录百炼。
+状态栏不会自动弹浏览器刷新数据；只有执行上面的手动刷新命令，或首次 `setup` 时，才会打开浏览器登录百炼。抓取入口会直接打开百炼控制台的 `free-quota` 页面，而不是先跳旧的 Coding Plan 详情页。
 
 ## 卸载
 
