@@ -27,6 +27,7 @@ runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
 - 抓取过程中会打开浏览器窗口
 - 如遇到滑块验证，请手动完成
 - 抓取完成后数据会缓存，statusLine 下次刷新时显示
+- statusLine 本身不会自动打开浏览器；只有这个手动刷新命令会启动抓取
 
 ## 注意事项
 
