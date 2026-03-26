@@ -18,19 +18,6 @@ export function writeCache(data, error, sessionId) {
     };
     writeJsonFileAtomic(cacheFile, cache, 0o600);
 }
-// 检查是否是同一会话且缓存有效
-export function isCacheValidForSession(cache, currentSessionId, sessionTimeoutMs) {
-    // 如果有会话ID且匹配，直接有效
-    if (cache.sessionId && cache.sessionId === currentSessionId) {
-        return true;
-    }
-    // 如果没有会话ID或会话ID不匹配，检查是否在超时时间内
-    return Date.now() - cache.timestamp < sessionTimeoutMs;
-}
-// 检查会话是否超时（用于判断是否需要刷新）
-export function isSessionTimeout(cache, sessionTimeoutMs) {
-    return Date.now() - cache.timestamp >= sessionTimeoutMs;
-}
 function readFetchLock() {
     try {
         const { fetchLockFile } = ensureRuntimeDir();

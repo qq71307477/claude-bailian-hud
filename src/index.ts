@@ -3,6 +3,18 @@ import { readConfig } from './config.js';
 import { readCache } from './cache.js';
 import { render } from './render.js';
 
+function getRenderNote(cacheError: string | undefined): string | undefined {
+  if (!cacheError) {
+    return undefined;
+  }
+
+  if (cacheError.includes('手动完成一次登录验证') || cacheError.includes('登录验证')) {
+    return '需手动登录';
+  }
+
+  return '上次同步失败';
+}
+
 async function main() {
   try {
     const config = readConfig();
@@ -13,14 +25,19 @@ async function main() {
     }
 
     const cache = readCache();
-
-    // statusLine 会被 Claude 高频调用，不能在这里自动拉起浏览器抓取。
+    const note = getRenderNote(cache?.error);
     if (cache?.data) {
-      console.log(render(cache.data));
+      console.log(render(cache.data, undefined, note));
     } else if (cache?.error) {
-      console.log(render(null, '数据获取失败，运行 /claude-bailian-hud:fetch 重试'));
+      console.log(render(
+        null,
+        cache.error,
+      ));
     } else {
-      console.log(render(null, '未获取数据，运行 /claude-bailian-hud:fetch'));
+      console.log(render(
+        null,
+        '未获取数据，运行 /claude-bailian-hud:fetch',
+      ));
     }
 
   } catch (error) {

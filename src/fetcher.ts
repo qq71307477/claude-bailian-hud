@@ -6,6 +6,21 @@ import { ensureRuntimeDir } from './runtime.js';
 
 const CODING_PLAN_DETAIL_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=coding-plan#/efm/coding-plan-detail';
 const USAGE_MARKERS = ['近5小时用量', '近一周用量', '近一月用量'];
+const HEADLESS_INTERVENTION_MESSAGE = '需要手动完成一次登录验证，请运行 /claude-bailian-hud:fetch';
+
+export interface FetchUsageOptions {
+  headless?: boolean;
+}
+
+export class ManualInterventionRequiredError extends Error {
+  code: 'auth_required';
+
+  constructor(message: string = HEADLESS_INTERVENTION_MESSAGE) {
+    super(message);
+    this.name = 'ManualInterventionRequiredError';
+    this.code = 'auth_required';
+  }
+}
 
 // 获取浏览器状态存储路径
 function getBrowserStatePath(): string {
@@ -77,7 +92,12 @@ async function openUsagePage(page: Page, reason: string): Promise<void> {
 }
 
 // 登录弹窗处理函数
-async function doLoginInDialog(page: Page, username: string, password: string): Promise<void> {
+async function doLoginInDialog(
+  page: Page,
+  username: string,
+  password: string,
+  headless: boolean,
+): Promise<void> {
   console.error('[bailian-hud] 处理登录弹窗...');
 
   // 使用 frameLocator 链式定位到登录表单
@@ -105,13 +125,20 @@ async function doLoginInDialog(page: Page, username: string, password: string): 
   const submitButton = loginFrame.getByRole('button', { name: '立即登录' });
   await submitButton.click();
 
-  // 等待登录完成 - 增加等待时间用于滑动验证
-  console.error('[bailian-hud] 如果有滑动验证码，请在浏览器中手动完成...');
-  await page.waitForTimeout(15000);
+  // 等待登录完成 - 可见模式给用户时间处理验证，无头模式则快速失败并交给手动兜底
+  if (headless) {
+    await page.waitForTimeout(5000);
+  } else {
+    console.error('[bailian-hud] 如果有滑动验证码，请在浏览器中手动完成...');
+    await page.waitForTimeout(15000);
+  }
 
   // 检查是否登录成功
   const loginDialog = await page.$('dialog iframe');
   if (loginDialog) {
+    if (headless) {
+      throw new ManualInterventionRequiredError();
+    }
     console.error('[bailian-hud] 登录弹窗仍存在，继续等待...');
     await page.waitForTimeout(10000);
   }
@@ -119,7 +146,7 @@ async function doLoginInDialog(page: Page, username: string, password: string): 
   console.error('[bailian-hud] 登录完成');
 }
 
-async function doLogin(page: Page, username: string, password: string): Promise<void> {
+async function doLogin(page: Page, username: string, password: string, headless: boolean): Promise<void> {
   console.error('[bailian-hud] 正在登录...');
 
   // 1. 点击登录按钮
@@ -130,10 +157,15 @@ async function doLogin(page: Page, username: string, password: string): Promise<
   }
 
   // 调用通用的弹窗登录函数
-  await doLoginInDialog(page, username, password);
+  await doLoginInDialog(page, username, password, headless);
 }
 
-async function ensureUsagePage(page: Page, username: string, password: string): Promise<void> {
+async function ensureUsagePage(
+  page: Page,
+  username: string,
+  password: string,
+  headless: boolean,
+): Promise<void> {
   await openUsagePage(page, '直接打开 Coding Plan 详情页');
 
   if (await isUsagePageReady(page)) {
@@ -152,9 +184,9 @@ async function ensureUsagePage(page: Page, username: string, password: string): 
   if (loginNowButton) {
     await loginNowButton.click();
     await page.waitForTimeout(2000);
-    await doLoginInDialog(page, username, password);
+    await doLoginInDialog(page, username, password, headless);
   } else {
-    await doLogin(page, username, password);
+    await doLogin(page, username, password, headless);
   }
 
   await openUsagePage(page, '登录后重新打开 Coding Plan 详情页');
@@ -165,19 +197,27 @@ async function ensureUsagePage(page: Page, username: string, password: string): 
   }
 
   await maybeSaveDebugScreenshot(page, 'coding-plan-not-ready-after-login.png');
+  if (headless && await needsLogin(page)) {
+    throw new ManualInterventionRequiredError();
+  }
   throw new Error('登录后仍未进入 Coding Plan 详情页');
 }
 
-export async function fetchUsage(username: string, password: string): Promise<UsageData> {
+export async function fetchUsage(
+  username: string,
+  password: string,
+  options: FetchUsageOptions = {},
+): Promise<UsageData> {
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
+  const headless = options.headless ?? false;
 
   try {
     const statePath = getBrowserStatePath();
 
     // 启动浏览器，使用持久化上下文
     browser = await chromium.launch({
-      headless: false,  // 使用有界面的浏览器以便调试
+      headless,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -213,7 +253,7 @@ export async function fetchUsage(username: string, password: string): Promise<Us
 
     const page = await context.newPage();
 
-    await ensureUsagePage(page, username, password);
+    await ensureUsagePage(page, username, password, headless);
 
     // 解析用量数据
     console.error('[bailian-hud] 解析用量数据...');

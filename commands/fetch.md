@@ -1,5 +1,5 @@
 ---
-description: 手动刷新百炼用量数据（启动浏览器抓取）
+description: 手动刷新百炼用量数据（优先无头，必要时打开浏览器）
 allowed-tools: Bash, Read
 ---
 
@@ -30,11 +30,11 @@ runtime=$(command -v bun 2>/dev/null || command -v node 2>/dev/null)
 
 ## Step 3: 提示用户
 
-- 抓取过程中会打开浏览器窗口
+- 默认先尝试无头抓取，只有遇到登录验证时才会打开浏览器窗口
 - 如遇到滑块验证，请手动完成
 - 插件会直接打开百炼控制台的 `Coding Plan` 详情页抓取，不再先跳首页
 - 抓取完成后数据会缓存，statusLine 下次刷新时显示
-- statusLine 本身不会自动打开浏览器；只有这个手动刷新命令会启动抓取
+- statusLine 本身不会自动刷新；只有 setup 首抓和这个手动刷新命令会更新缓存
 
 ## 注意事项
 

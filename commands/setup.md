@@ -96,16 +96,22 @@ EOF
 
 ## Step 5: 首次抓取数据
 
-执行 fetch-cli.js 进行首次数据抓取：
+执行 fetch-cli.js 进行首次数据抓取，**首次抓取优先走无头模式**：
 
 ```bash
 bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-bailian-hud/claude-bailian-hud/*/ 2>/dev/null | sort -V | tail -1)
-{RUNTIME_PATH} "${bailian_dir}dist/fetch-cli.js"
+BAILIAN_FETCH_SOURCE=setup "{RUNTIME_PATH}" "${bailian_dir}dist/fetch-cli.js"
 ```
 
 **如果 Step 4 写入失败，不要继续这一步。**
 
-提示用户可能需要在弹出的浏览器窗口中完成滑块验证。
+如果这一步成功，就继续完成提示。
+
+如果这一步输出“需要手动完成一次登录验证”，不要自动再拉起可见浏览器；直接告诉用户：
+
+> 首次无头抓取已完成尝试，但当前账号需要手动完成一次登录验证。
+> 请运行 `/claude-bailian-hud:fetch`，按提示在浏览器里完成一次登录或滑块验证。
+> 完成后，statusLine 会显示最新一次手动同步到的结果。
 
 ## Step 6: 完成提示
 
@@ -122,6 +128,6 @@ bailian_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-b
 > [Haiku] ████░░░░░ 32% | pro git:(main*)     ← 原有 HUD（下方）
 > ```
 >
-> 手动刷新数据：`/claude-bailian-hud:fetch`
+> setup 会先尝试一次无头抓取；之后不会自动刷新，手动同步请运行：`/claude-bailian-hud:fetch`
 >
 > 如果以后要彻底恢复安装前状态，请先运行：`/claude-bailian-hud:uninstall`

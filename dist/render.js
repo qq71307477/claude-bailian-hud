@@ -14,7 +14,7 @@ function getColorForPercent(percent) {
         return colors.yellow;
     return colors.green;
 }
-export function render(data, error) {
+export function render(data, error, note) {
     if (error) {
         return `${colors.red}[bailian-hud] 错误: ${error}${colors.reset}`;
     }
@@ -30,6 +30,7 @@ export function render(data, error) {
         `周: ${weekColor}${data.week}%${colors.reset} │ ` +
         `月: ${monthColor}${data.month}%${colors.reset}`;
     // 第二行：重置时间
-    const line2 = `${colors.dim}       重置: ${data.fiveHourReset} │ ${data.weekReset} │ ${data.monthReset}${colors.reset}`;
+    const extra = note ? ` · ${note}` : '';
+    const line2 = `${colors.dim}       重置: ${data.fiveHourReset} │ ${data.weekReset} │ ${data.monthReset}${extra}${colors.reset}`;
     return `${line1}\n${line2}`;
 }
