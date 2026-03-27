@@ -54,6 +54,13 @@ async function getBodyText(page: Page): Promise<string> {
   return page.evaluate(() => document.body.innerText);
 }
 
+function getNormalizedLines(bodyText: string): string[] {
+  return bodyText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
 function hasUsageMarkers(bodyText: string): boolean {
   return USAGE_MARKERS.every((marker) => bodyText.includes(marker));
 }
@@ -280,6 +287,7 @@ async function parseUsageData(page: Page): Promise<UsageData> {
 
   try {
     const bodyText = await getBodyText(page);
+    const lines = getNormalizedLines(bodyText);
     console.error('[bailian-hud] 页面文本长度:', bodyText.length);
     console.error('[bailian-hud] 页面文本前500字符:', bodyText.substring(0, 500));
 
@@ -288,7 +296,6 @@ async function parseUsageData(page: Page): Promise<UsageData> {
     }
 
     // 调试：打印包含关键词的行
-    const lines = bodyText.split('\n');
     for (const line of lines) {
       if (line.includes('近5小时') || line.includes('近一周') || line.includes('近一月') || line.includes('%') || line.includes('重置')) {
         console.error('[bailian-hud] 相关行:', line.trim());
@@ -299,24 +306,39 @@ async function parseUsageData(page: Page): Promise<UsageData> {
     const planNameMatch = bodyText.match(/(Lite|Pro)(基础|高级)?套餐/);
     const planName = planNameMatch ? planNameMatch[1] : 'Lite';
 
-    // 解析百分比 - 按位置查找每个用量区域的百分比
-    // 页面结构：近5小时用量 -> 百分比 -> 近一周用量 -> 百分比 -> 近一月用量 -> 百分比
-    const sections = bodyText.split(/近(?:5小时|一周|一月)用量/);
-    const usagePercents: number[] = [];
+    // 解析百分比：每个用量区块在“重置”后出现的第一个百分比就是实际用量。
+    // 后面的 0% / 50% / 90% / 100% 是进度条刻度，不能把真实 0% 过滤掉。
+    const usagePercents = USAGE_MARKERS.map((marker) => {
+      const markerIndex = lines.findIndex((line) => line.includes(marker));
+      if (markerIndex === -1) {
+        throw new Error(`未找到 ${marker} 区块`);
+      }
 
-    for (let i = 1; i < sections.length && usagePercents.length < 3; i++) {
-      const section = sections[i];
-      // 在每个区域找第一个百分比数字（跳过进度条刻度 0%）
-      const percents = section.match(/(\d+)%/g) || [];
-      for (const p of percents) {
-        const val = parseInt(p, 10);
-        // 跳过进度条刻度 0%，其他都可能是实际用量
-        if (val > 0) {
-          usagePercents.push(val);
+      let sawResetLine = false;
+      for (let i = markerIndex + 1; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (USAGE_MARKERS.some((nextMarker) => nextMarker !== marker && line.includes(nextMarker))) {
           break;
         }
+
+        if (line.includes('重置')) {
+          sawResetLine = true;
+          continue;
+        }
+
+        if (!sawResetLine) {
+          continue;
+        }
+
+        const percentMatch = line.match(/(\d+)%/);
+        if (percentMatch?.[1]) {
+          return parseInt(percentMatch[1], 10);
+        }
       }
-    }
+
+      throw new Error(`未能解析 ${marker} 百分比`);
+    });
 
     console.error('[bailian-hud] 解析用量百分比:', usagePercents);
 
