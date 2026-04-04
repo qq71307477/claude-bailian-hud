@@ -1,8 +1,0 @@
-.claude/
-.git/
-src/
-output/
-scripts/
-tsconfig.json
-.gitignore
-.DS_Store

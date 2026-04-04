@@ -1,23 +1,10 @@
 import { chromium } from 'playwright';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 import { ensureRuntimeDir } from './runtime.js';
 const CODING_PLAN_DETAIL_URL = 'https://bailian.console.aliyun.com/cn-beijing/?tab=coding-plan#/efm/coding-plan-detail';
 const USAGE_MARKERS = ['近5小时用量', '近一周用量', '近一月用量'];
 const HEADLESS_INTERVENTION_MESSAGE = '需要手动完成一次登录验证，请运行 /claude-bailian-hud:fetch';
-const HEADLESS_EXECUTABLE_NAMES = new Set([
-    'chrome-headless-shell',
-    'headless_shell',
-    'chrome-headless-shell.exe',
-    'headless_shell.exe',
-]);
-const HEADED_EXECUTABLE_NAMES = new Set([
-    'Google Chrome for Testing',
-    'Google Chrome',
-    'chrome',
-    'chrome.exe',
-]);
 export class ManualInterventionRequiredError extends Error {
     code;
     constructor(message = HEADLESS_INTERVENTION_MESSAGE) {
@@ -33,109 +20,6 @@ function getBrowserStatePath() {
         fs.mkdirSync(browserStateDir, { recursive: true });
     }
     return browserStateDir;
-}
-function getPlaywrightCacheRoots() {
-    const homeDir = os.homedir();
-    return [
-        path.join(homeDir, 'Library', 'Caches', 'ms-playwright'),
-        path.join(homeDir, '.cache', 'ms-playwright'),
-    ].filter((dir, index, list) => list.indexOf(dir) === index);
-}
-function getSystemBrowserCandidates(headless) {
-    if (process.platform !== 'darwin') {
-        return [];
-    }
-    if (headless) {
-        return [
-            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-        ];
-    }
-    return [
-        '/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing',
-        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-        '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
-    ];
-}
-function collectBrowserRevisionDirs(prefixes) {
-    const dirs = [];
-    for (const rootDir of getPlaywrightCacheRoots()) {
-        if (!fs.existsSync(rootDir)) {
-            continue;
-        }
-        for (const entry of fs.readdirSync(rootDir, { withFileTypes: true })) {
-            if (!entry.isDirectory()) {
-                continue;
-            }
-            for (const prefix of prefixes) {
-                if (!entry.name.startsWith(prefix)) {
-                    continue;
-                }
-                const revision = Number.parseInt(entry.name.slice(prefix.length), 10);
-                dirs.push({
-                    fullPath: path.join(rootDir, entry.name),
-                    revision: Number.isFinite(revision) ? revision : -1,
-                });
-                break;
-            }
-        }
-    }
-    return dirs
-        .sort((a, b) => b.revision - a.revision)
-        .map((item) => item.fullPath);
-}
-function findExecutableInTree(rootDir, executableNames, maxDepth = 6) {
-    const visited = new Set();
-    function visit(currentPath, depth) {
-        if (depth > maxDepth || visited.has(currentPath)) {
-            return undefined;
-        }
-        visited.add(currentPath);
-        let stat;
-        try {
-            stat = fs.statSync(currentPath);
-        }
-        catch {
-            return undefined;
-        }
-        if (stat.isFile() && executableNames.has(path.basename(currentPath))) {
-            return currentPath;
-        }
-        if (!stat.isDirectory()) {
-            return undefined;
-        }
-        const entries = fs.readdirSync(currentPath, { withFileTypes: true });
-        for (const entry of entries) {
-            const found = visit(path.join(currentPath, entry.name), depth + 1);
-            if (found) {
-                return found;
-            }
-        }
-        return undefined;
-    }
-    return visit(rootDir, 0);
-}
-function resolveChromiumExecutablePath(headless) {
-    const envExecutablePath = process.env.BAILIAN_CHROMIUM_EXECUTABLE_PATH;
-    if (envExecutablePath && fs.existsSync(envExecutablePath)) {
-        return envExecutablePath;
-    }
-    const executableNames = headless ? HEADLESS_EXECUTABLE_NAMES : HEADED_EXECUTABLE_NAMES;
-    const cachePrefixes = headless
-        ? ['chromium_headless_shell-', 'chromium-']
-        : ['chromium-'];
-    for (const revisionDir of collectBrowserRevisionDirs(cachePrefixes)) {
-        const executablePath = findExecutableInTree(revisionDir, executableNames);
-        if (executablePath) {
-            return executablePath;
-        }
-    }
-    for (const candidatePath of getSystemBrowserCandidates(headless)) {
-        if (fs.existsSync(candidatePath)) {
-            return candidatePath;
-        }
-    }
-    return undefined;
 }
 async function maybeSaveDebugScreenshot(page, filename) {
     if (process.env.BAILIAN_DEBUG !== '1') {
@@ -284,11 +168,9 @@ export async function fetchUsage(username, password, options = {}) {
     const headless = options.headless ?? false;
     try {
         const statePath = getBrowserStatePath();
-        const executablePath = resolveChromiumExecutablePath(headless);
         // 启动浏览器，使用持久化上下文
         browser = await chromium.launch({
             headless,
-            executablePath,
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -297,9 +179,6 @@ export async function fetchUsage(username, password, options = {}) {
                 '--window-size=1280,800',
             ],
         });
-        if (executablePath) {
-            console.error('[bailian-hud] 使用本地 Chromium 可执行文件:', executablePath);
-        }
         // 尝试加载保存的状态
         try {
             context = await browser.newContext({
