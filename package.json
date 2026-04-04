@@ -5,10 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "files": [
-    "dist/",
-    "src/",
-    "commands/",
-    ".claude-plugin/"
+    "dist",
+    "commands",
+    ".claude-plugin"
   ],
   "scripts": {
     "build": "tsc",
